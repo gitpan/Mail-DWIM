@@ -1,0 +1,19 @@
+--- #YAML:1.0
+name:                Mail-DWIM
+version:             0.01
+abstract:            Do-What-I-Mean Mailer
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.31
+distribution_type:   module
+requires:     
+    File::Temp:                    0
+    Log::Log4perl:                 1
+    Mail::Mailer:                  0
+    Sys::Hostname:                 1
+    Test::More:                    0
+    YAML:                          0
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2
+author:
+    - Mike Schilli <cpan@perlmeister.com>
