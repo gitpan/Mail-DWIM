@@ -6,7 +6,7 @@ use strict;
 use warnings;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(mail);
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 our @HTML_MODULES = qw(HTML::FormatText HTML::TreeBuilder MIME::Lite);
 our @ATTACH_MODULES = qw(File::MMagic MIME::Lite);
 
@@ -16,6 +16,7 @@ use Config;
 use Mail::Mailer;
 use Sys::Hostname;
 use File::Basename;
+use File::Spec;
 
 my $error;
 
@@ -48,8 +49,7 @@ sub new {
       # Guess the 'from' address
     if(! exists $self->{from}) {
         my $user   = scalar getpwuid($<);
-        my $domain = $Config{mydomain};
-        $domain =~ s/^\.//;
+        my $domain = domain();
         $self->{from} = "$user\@$domain";
     }
 
@@ -68,6 +68,25 @@ sub new {
     %$self = (%$self, %defaults, %options);
 
     bless $self, $class;
+}
+
+###########################################
+sub cmd_line_mail {
+###########################################
+    my($self) = @_;
+
+    $self->{subject} = 'no subject' unless defined $self->{subject};
+
+    my $mailer;
+    $mailer = $self->{program} if defined $self->{program};
+    $mailer = bin_find("mail") unless defined $mailer;
+
+    open(PIPE, "|-", $mailer,
+                    "-s", $self->{subject}, $self->{to},
+        ) or LOGDIE "Opening $mailer failed: $!";
+
+    print PIPE $self->{text};
+    return close PIPE;
 }
 
 ###########################################
@@ -93,6 +112,8 @@ sub send {
     } elsif($self->{transport} eq "smtp") {
         LOGDIE "No smtp_server set" unless defined $self->{smtp_server};
         @options = ("smtp", Server => $self->{smtp_server});
+    } elsif($self->{transport} eq "mail") {
+        return $self->cmd_line_mail();
     } else {
         LOGDIE "Unknown transport '$self->{transport}'";
     }
@@ -120,7 +141,7 @@ sub send {
         DEBUG "Appending to test file $ENV{MAIL_DWIM_TEST}";
         my $txt;
         for (keys %headers) {
-            $txt .= "$_: $headers{$_}\n";
+            $txt .= "$_: $headers{$_}\n" if defined $headers{$_};
         }
         $txt .= "\n";
 
@@ -368,6 +389,43 @@ sub slurp {
     close FILE;
     return $data;
 }
+
+###########################################
+sub domain {
+###########################################
+
+    my $domain = $Config{mydomain};
+
+    if(defined $domain and length($domain)) {
+        $domain =~ s/^\.//;
+        return $domain;
+    }
+
+    eval { require Sys::Hostname; };
+    if(! $@) {
+        $domain = hostname();
+        return $domain;
+    }
+
+    $domain = "localhost";
+
+    return $domain;
+}
+
+######################################
+sub bin_find {
+######################################
+    my($exe) = @_;
+
+    for my $path (split /:/, $ENV{PATH}) {
+        my $full = File::Spec->catfile($path, $exe);
+
+        return $full if -x $full;
+    }
+
+    return undef;
+}
+
 1;
 
 __END__
@@ -381,7 +439,7 @@ Mail::DWIM - Do-What-I-Mean Mailer
     use Mail::DWIM qw(mail);
 
     mail(
-      to      => 'foo@bar.com'
+      to      => 'foo@bar.com',
       subject => 'test message',
       text    => 'test message text'
     );
@@ -406,7 +464,7 @@ C<Mail::DWIM> uses defaults wherever possible. So if you say
     use Mail::DWIM qw(mail);
 
     mail(
-      to      => 'foo@bar.com'
+      to      => 'foo@bar.com',
       subject => 'test message',
       text    => 'test message text',
     );
@@ -419,7 +477,7 @@ If you want to specify a different 'From:' field, go ahead:
 
     mail(
       from    => 'me@mydomain.com',
-      to      => 'foo@bar.com'
+      to      => 'foo@bar.com',
       subject => 'test message',
       text    => 'test message text',
     );
@@ -428,11 +486,22 @@ By default, C<Mail::DWIM> connects to a running sendmail daemon to
 deliver the mail. But you can also specify an SMTP server:
 
     mail(
-      to          => 'foo@bar.com'
+      to          => 'foo@bar.com',
       subject     => 'test message',
       text        => 'test message text',
       transport   => 'smtp',
       smtp_server => 'smtp.foobar.com',
+    );
+
+Or, if you prefer that Mail::DWIM uses the C<mail> Unix command line
+utility, use 'mail' as a transport:
+
+    mail(
+      to          => 'foo@bar.com',
+      subject     => 'test message',
+      text        => 'test message text',
+      transport   => 'mail',
+      program     => '/usr/bin/mail',
     );
 
 On a given system, these settings need to be specified only once and
@@ -460,7 +529,7 @@ a false value:
 
     my $rc = mail(
       raise_error => 0,
-      to          => 'foo@bar.com'
+      to          => 'foo@bar.com',
       ...
     );
 
@@ -489,7 +558,7 @@ for people with arcane email readers, everybody is happy. C<Mail::DWIM>
 makes this easy with the C<html_compat> option:
 
     mail(
-      to          => 'foo@bar.com'
+      to          => 'foo@bar.com',
       subject     => 'test message',
       html_compat => 1,
       text        => 'This is an <b>HTML</b> email.'
