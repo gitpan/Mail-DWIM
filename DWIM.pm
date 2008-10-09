@@ -6,7 +6,7 @@ use strict;
 use warnings;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(mail);
-our $VERSION = "0.03";
+our $VERSION = "0.04";
 our @HTML_MODULES = qw(HTML::FormatText HTML::TreeBuilder MIME::Lite);
 our @ATTACH_MODULES = qw(File::MMagic MIME::Lite);
 
@@ -16,6 +16,7 @@ use Config;
 use Mail::Mailer;
 use Sys::Hostname;
 use File::Basename;
+use POSIX qw(strftime);
 use File::Spec;
 
 my $error;
@@ -51,6 +52,11 @@ sub new {
         my $user   = scalar getpwuid($<);
         my $domain = domain();
         $self->{from} = "$user\@$domain";
+    }
+
+      # Guess the 'date'
+    if (!exists $self->{date}) {
+        $self->{date} = strftime("%a, %e %b %Y %H:%M:%S %Z", localtime(time));
     }
 
     for my $cfg (qw(global_cfg_file user_cfg_file)) {
