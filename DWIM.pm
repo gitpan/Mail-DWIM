@@ -6,7 +6,7 @@ use strict;
 use warnings;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(mail);
-our $VERSION = "0.05";
+our $VERSION = "0.06";
 our @HTML_MODULES = qw(HTML::FormatText HTML::TreeBuilder MIME::Lite);
 our @ATTACH_MODULES = qw(File::MMagic MIME::Lite);
 
@@ -118,6 +118,7 @@ sub send {
     } elsif($self->{transport} eq "smtp") {
         LOGDIE "No smtp_server set" unless defined $self->{smtp_server};
         @options = ("smtp", Server => $self->{smtp_server});
+        $self->{to} = [split /\s*,\s*/, $self->{to}];
     } elsif($self->{transport} eq "mail") {
         return $self->cmd_line_mail();
     } else {
